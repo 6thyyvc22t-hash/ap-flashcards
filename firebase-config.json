@@ -1,6 +1,9 @@
 {
-  "apiKey": "",
-  "authDomain": "",
-  "projectId": "",
-  "appId": ""
+  "apiKey": "AIzaSyD64NG22HeU8Km3FrugIzQJWMg-jc4rTQw",
+  "authDomain": "ap-study-sync.firebaseapp.com",
+  "projectId": "ap-study-sync",
+  "storageBucket": "ap-study-sync.firebasestorage.app",
+  "messagingSenderId": "396051603076",
+  "appId": "1:396051603076:web:92bbdbd33cd30078a3ecd1",
+  "measurementId": "G-67KTRX6DME"
 }
