@@ -13,7 +13,7 @@
   <header class="hero">
     <p class="eyebrow">応用情報技術者試験・科目B</p>
     <div class="heroRow"><h1>デジタル単語帳</h1><span class="heroCount" id="deckCount">準備中</span></div>
-    <p class="muted">問題の追加・編集・削除・復元に対応。学習記録は問題IDごとに保持。Firebase認証でiPad・iPhone間の自動同期に対応。</p>
+    <p class="muted">問題の追加・編集・削除・復元に対応。学習記録は問題IDごとに保持。Firebase認証でiPad・iPhone間の学習記録・メモの同期に対応。</p>
   </header>
   <noscript><div class="alert error">JavaScriptが無効です。GitHub Pagesで公開したURLをSafariから開いてください。</div></noscript>
   <div id="loadError" class="alert error hidden" role="alert"></div>
@@ -30,7 +30,7 @@
       <p class="small">両端末で同じメールアドレスとパスワードを使用します。パスワードをサイトに保存しません。</p>
     </div>
     <div id="cloudUserPanel" class="hidden">
-      <div class="inlineActions"><button type="button" id="cloudLogout" class="quiet">ログアウト</button><button type="button" id="cloudMigrate" class="quiet hidden">この端末の以前の成績を移行</button><button type="button" id="cloudExportLegacy" class="quiet hidden">移行前の成績を保存</button></div>
+      <div class="inlineActions"><button type="button" id="cloudLogout" class="quiet">ログアウト</button><button type="button" id="cloudMigrate" class="quiet hidden">この端末の以前の成績を移行</button><button type="button" id="cloudExportLegacy" class="quiet hidden">移行前の成績を保存</button><button type="button" id="cloudMigrateNotes" class="quiet hidden">端末メモを初回同期</button></div>
       <p id="cloudMigrationInfo" class="small hidden"></p>
     </div>
     <details id="cloudSetup" class="cloudSetup"><summary>Firebase設定（初回設定時のみ）</summary>
@@ -48,6 +48,7 @@
       <div class="stat"><span>正解回数</span><strong id="sCorrect">0</strong></div>
       <div class="stat"><span>不正解回数</span><strong id="sWrong">0</strong></div>
       <div class="stat"><span>要復習</span><strong id="sMissed">0</strong></div>
+      <div class="stat"><span>メモあり</span><strong id="sMemo">0</strong></div>
     </div>
 
     <section class="controls panel" aria-label="出題条件">
@@ -74,7 +75,19 @@
       <button class="correct" id="correctBtn" type="button" disabled>✓ 正解</button>
     </div>
     <div class="cardNav"><button id="prevBtn" type="button">← 前の問題</button><button id="showBtn" type="button">答えを見る</button><button id="nextBtn" type="button">次の問題 →</button></div>
+    <section class="memoPanel panel" id="memoPanel" aria-label="この問題の学習メモ">
+      <div class="memoHeader"><h3>✎ この問題のメモ</h3><span id="memoFlag" class="small">メモなし</span></div>
+      <label class="fullWidth" for="memoText">覚え方・間違えた理由・補足事項など</label>
+      <textarea id="memoText" rows="3" maxlength="2000" placeholder="例：SOCは監視、CSIRTはインシデント対応。" spellcheck="false"></textarea>
+      <div class="inlineActions"><button type="button" id="memoSave">メモを保存</button><button type="button" id="memoClear" class="quiet">メモを削除</button><span id="memoStatus" class="small" role="status">端末に自動保存します</span></div>
+      <p class="small">入力するたびに端末に保存します。ログイン中はクラウドにも自動同期します。メモは他の人には公開されません（最大2,000文字）。</p>
+    </section>
     <div id="emptyMessage" class="panel empty hidden">条件に合う問題はありません。出題分野・方法を変更してください。</div>
+
+    <details class="tools panel" id="memoTools"><summary>メモのバックアップ・復元</summary>
+      <div class="inlineActions"><button type="button" id="exportMemos">メモを保存（JSON）</button><label class="likeButton" for="importMemos">メモを読み込む</label><input type="file" id="importMemos" accept=".json,application/json" class="visuallyHidden"></div>
+      <p class="small">メモは学習記録とは別管理です。JSONからの復元は現在のメモを上書きします。クラウドログイン中は他の端末にも反映されます。</p>
+    </details>
 
     <details class="tools panel" id="reviewTools"><summary>学習記録のバックアップ・復元</summary>
       <div class="inlineActions"><button id="exportProgress" type="button">学習記録を保存（JSON）</button><label class="likeButton" for="importProgress">学習記録を読み込む</label><input id="importProgress" type="file" accept=".json,application/json" class="visuallyHidden"><button class="danger" id="resetProgress" type="button">学習記録をリセット</button></div>

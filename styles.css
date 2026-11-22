@@ -2,3 +2,15 @@
 
 /* Firebase identity and sync UI */
 .cloudPanel{margin:14px 0 18px;padding:18px}.cloudHeader{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}.cloudHeader strong{font-size:1.03rem}.cloudPanel .small{line-height:1.6}.cloudPanel label{display:block;margin:8px 0;font-size:.9rem;color:var(--muted)}.cloudPanel input,.cloudPanel textarea{display:block;width:100%;margin:6px 0 12px;padding:12px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--txt);font:inherit}.cloudPanel .inlineActions{display:flex;flex-wrap:wrap;gap:9px;margin:9px 0}.cloudPanel button{min-height:42px}.cloudSetup{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}.cloudSetup summary{cursor:pointer;font-weight:600;color:var(--muted)}.cloudPanel .small.errorText{color:var(--red)}.cloudPanel .small.okText{color:var(--green)}
+
+/* Personal notes: isolated from public questions and tap-to-flip card */
+.memoPanel{margin-top:14px}
+.memoHeader{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px}
+.memoHeader h3{font-size:1.1rem;margin:0}
+.memoHeader .small{color:var(--blue)}
+.memoPanel textarea{display:block;width:100%;min-height:102px;resize:vertical;margin:10px 0 12px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);color:var(--txt);font:inherit;line-height:1.55}
+.memoPanel textarea:focus{outline:2px solid var(--blue);outline-offset:1px}
+.memoPanel .inlineActions{align-items:center;flex-wrap:wrap}
+.memoPanel .small{line-height:1.6}
+.memoPanel #memoStatus{flex:1;min-width:145px}
+.memoPanel button:disabled{opacity:.5}

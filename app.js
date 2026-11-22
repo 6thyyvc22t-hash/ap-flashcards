@@ -9,10 +9,14 @@ const DECK_ID='ap-kamoku-b';
 const KEY_FIREBASE_CONFIG='ap-flashcards-firebase-config-v1';
 const KEY_LOCAL_SNAPSHOT='ap-flashcards-precloud-backup-v1';
 const KEY_CLOUD_ACCOUNT='ap-flashcards-last-cloud-account-v1';
+const KEY_NOTES_ANON='ap-flashcards-notes-anonymous-v1';
+const KEY_NOTES_CACHE_PREFIX='ap-flashcards-notes-cache-v1:';
+const BACKUP_NOTES_KIND='ap-flashcards-notes';
 let cloud=null,cloudUser=null,cloudStarting=false,preCloudSnapshot=null;
+let memoCloud=null,memoUserId=null;
 
 const fields=['category','question','answer','explanation','point'];
-const state={base:null,deck:null,draft:null,progress:{},storage:false,category:'ALL',mode:'ordered',current:null,answerShown:false,visibleIds:[],conflict:null};
+const state={base:null,deck:null,draft:null,progress:{},notes:{},storage:false,category:'ALL',mode:'ordered',current:null,answerShown:false,visibleIds:[],conflict:null};
 const idIndex=()=>new Map(state.deck.cards.map((x,i)=>[x.id,i]));
 const r=(id)=>state.progress[id]||{seen:false,correct:0,incorrect:0,needsReview:false};
 const positive=(x)=>Number.isFinite(Number(x))?Math.max(0,Math.floor(Number(x))):0;
@@ -22,6 +26,78 @@ function cleanProgress(p){
     if(!/^[A-Za-z0-9_-]{1,64}$/.test(id)||!v||typeof v!=='object'||Array.isArray(v))continue;
     out[id]={seen:!!v.seen,correct:positive(v.correct??v.right),incorrect:positive(v.incorrect??v.wrong),needsReview:!!(v.needsReview??v.review)};
   }return out;
+}
+function cleanNotes(p){
+ if(!p||typeof p!=='object'||Array.isArray(p))return {};
+ const result={};
+ for(const [id,text] of Object.entries(p)){
+  if(/^[A-Za-z0-9_-]{1,64}$/.test(id)&&typeof text==='string'&&text.length<=2000&&text.trim())result[id]=text;
+ }
+ return result;
+}
+function hasMemos(notes){return Object.values(notes||{}).some(s=>typeof s==='string'&&s.trim())}
+function updateMemoStatus(msg,isError=false){
+ $('memoStatus').textContent=msg;
+ $('memoStatus').classList.toggle('errorText',isError);
+ $('memoStatus').classList.toggle('okText',!isError&&msg.startsWith('✓'));
+}
+function updateMemoMigration(){
+ const local=cleanNotes(read(KEY_NOTES_ANON));
+ $('cloudMigrateNotes').classList.toggle('hidden',!(memoUserId&&memoCloud?.loaded&&hasMemos(local)&&!memoCloud.pendingCount));
+}
+function renderMemo(){
+ const cardId=state.current;
+ $('memoPanel').classList.toggle('hidden',!cardId);
+ $('memoText').disabled=!cardId;
+ $('memoSave').disabled=!cardId;
+ $('memoClear').disabled=!cardId;
+ if(!cardId)return;
+ const input=$('memoText'),text=state.notes[cardId]||'';
+ const isNew=input.dataset.cardId!==cardId;
+ if(isNew || (document.activeElement!==input && input.value!==text))input.value=text;
+ input.dataset.cardId=cardId;
+ $('memoFlag').textContent=text.trim()?'メモあり':'メモなし';
+}
+function changeMemo(text){
+ const id=state.current;
+ if(!id)return;
+ if(typeof text!=='string'||text.length>2000)return;
+ if(text.trim())state.notes[id]=text;else delete state.notes[id];
+ $('memoFlag').textContent=text.trim()?'メモあり':'メモなし';
+ $('sMemo').textContent=String(state.deck.cards.filter(c=>(state.notes[c.id]||'').trim()).length);
+ if(memoUserId&&memoCloud){
+  if(!memoCloud.queueNote(id,text))updateMemoStatus('⚠ メモを保存できません。端末の容量を確認してください。',true);
+ }else{
+  const ok=store(KEY_NOTES_ANON,state.notes);
+  updateMemoStatus(ok?'✓ この端末に保存済み（ログインするとクラウド同期できます）':'⚠ 端末への保存に失敗しました',!ok);
+ }
+ updateMemoMigration();
+}
+async function migrateOldNotes(){
+ const notes=cleanNotes(read(KEY_NOTES_ANON));
+ if(!memoUserId||!memoCloud||!hasMemos(notes))return;
+ if(!confirm('ログイン前に保存した端末メモをクラウドへ追加します。クラウド側にメモがある問題は上書きしません。続行しますか？'))return;
+ try{
+  const added=await memoCloud.migrateLocalNotes(notes);
+  alert(added+'問のメモを追加しました。端末側の元メモはバックアップとして残しています。');
+ }catch(e){alert('メモ移行に失敗：'+e.message)}
+}
+function exportMemos(){fileDownload({type:BACKUP_NOTES_KIND,version:1,deckId:DECK_ID,exportedAt:new Date().toISOString(),notes:state.notes},'ap-flashcards-notes.json')}
+function importMemos(file){
+ if(!file)return;
+ file.text().then(async txt=>{
+  const parsed=JSON.parse(txt);
+  if(parsed.type!==BACKUP_NOTES_KIND||parsed.deckId!==DECK_ID||!parsed.notes||typeof parsed.notes!=='object')throw Error('この単語帳のメモJSONではありません');
+  const notes=cleanNotes(parsed.notes);
+  if(memoUserId&&memoCloud){
+   if(!confirm('クラウドの全メモをこのJSONで置き換えます。iPhoneとiPadの両方に反映されます。続けますか？'))return;
+   await memoCloud.replaceNotes(notes);
+   alert('メモをクラウドに復元しました。');
+  }else if(confirm('この端末の全メモをJSONの内容で置き換えますか？')){
+   if(!store(KEY_NOTES_ANON,notes))throw Error('端末へ保存できません');
+   state.notes=notes;render();alert('メモを端末に復元しました。');
+  }
+ }).catch(e=>alert('メモの読み込みに失敗：'+e.message));
 }
 function validateDeck(raw){
   if(!raw||typeof raw!=='object'||raw.deckId!==DECK_ID||!Array.isArray(raw.cards)||!Array.isArray(raw.archivedCards))throw Error('この単語帳に対応しないJSONです');
@@ -85,6 +161,7 @@ function renderStats(){
  $('sTotal').textContent=String(cards.length);$('deckCount').textContent='全'+cards.length+'問';$('sStudied').textContent=String(studied);
  $('sCorrect').textContent=String(correct);$('sWrong').textContent=String(wrong);$('sMissed').textContent=String(missed);
  $('sAccuracy').textContent=correct+wrong?(correct/(correct+wrong)*100).toFixed(1)+'%':'—';
+ $('sMemo').textContent=String(cards.filter(c=>!!(state.notes[c.id]||'').trim()).length);
 }
 function render(){
  renderStats();const pool=getPool();state.visibleIds=pool;
@@ -105,6 +182,7 @@ function render(){
  }
  for(const id of ['wrongBtn','correctBtn'])$(id).disabled=!(has&&state.answerShown);
  for(const id of ['skipBtn','prevBtn','nextBtn','showBtn'])$(id).disabled=!has;
+ renderMemo();
 }
 function toggleAnswer(){if(!state.current)return;state.answerShown=!state.answerShown;render();}
 function grade(kind){
@@ -214,6 +292,11 @@ function initHandlers(){
  $('skipBtn').addEventListener('click',()=>nextCard());
  $('nextBtn').addEventListener('click',()=>nextCard());
  $('prevBtn').addEventListener('click',()=>nextCard(-1));
+ $('memoText').addEventListener('input',e=>changeMemo(e.target.value));
+ $('memoSave').addEventListener('click',()=>{if(state.current)changeMemo($('memoText').value);memoCloud?.syncNow()});
+ $('memoClear').addEventListener('click',()=>{if(!state.current)return;if(!confirm('この問題のメモを削除しますか？ログイン中は他の端末にも反映されます。'))return;$('memoText').value='';changeMemo('');memoCloud?.syncNow()});
+ $('exportMemos').addEventListener('click',exportMemos);
+ $('importMemos').addEventListener('change',e=>{importMemos(e.target.files[0]);e.target.value=''});
  $('categoryFilter').addEventListener('change',e=>{state.category=e.target.value;resetSelection()});
  $('modeFilter').addEventListener('change',e=>{state.mode=e.target.value;resetSelection()});
  $('exportProgress').addEventListener('click',exportProgress);
@@ -235,6 +318,7 @@ function initHandlers(){
  $('authSignUp').addEventListener('click',()=>authenticate(true));
  $('cloudLogout').addEventListener('click',async()=>{if(!cloud)return;try{await cloud.signOut()}catch(e){showCloudStatus('ログアウト失敗：'+e.message,true)}});
  $('cloudMigrate').addEventListener('click',migrateOldProgress);
+ $('cloudMigrateNotes').addEventListener('click',migrateOldNotes);
  $('cloudExportLegacy').addEventListener('click',()=>{if(preCloudSnapshot)fileDownload({type:BACKUP_KIND,version:2,deckId:DECK_ID,exportedAt:new Date().toISOString(),progress:preCloudSnapshot},'ap-flashcards-before-cloud.json')});
  $('firebaseApplyConfig').addEventListener('click',()=>{
   try{const v=parseFirebaseConfig($('firebaseConfigInput').value);if(!state.storage)throw Error('端末ストレージが利用できないため設定を保存できません');store(KEY_FIREBASE_CONFIG,v);alert('Firebase設定を保存しました。画面を再読み込みして接続します。');location.reload();}
@@ -324,6 +408,19 @@ async function initCloud(){
      },
      onStatus(message,isError){showCloudStatus(message,isError)}
    });
+   const {createMemoSync}=await import('./memo-sync.js');
+   memoCloud=createMemoSync({
+     onUser(user){
+       memoUserId=user?.uid||null;
+       state.notes=memoUserId?cleanNotes(read(KEY_NOTES_CACHE_PREFIX+memoUserId)):cleanNotes(read(KEY_NOTES_ANON));
+       renderMemo();renderStats();updateMemoMigration();
+     },
+     onNotes(notes){
+       state.notes=cleanNotes(notes);
+       renderMemo();renderStats();updateMemoMigration();
+     },
+     onStatus(message,isError){updateMemoStatus(message,isError)}
+   });
  }catch(e){showCloudStatus('Firebaseへの接続失敗：'+e.message+'。設定や通信を確認してください。',true)}
 }
 
@@ -337,6 +434,7 @@ async function init(){
    const probe='ap-flashcards-probe';localStorage.setItem(probe,'ok');state.storage=localStorage.getItem(probe)==='ok';localStorage.removeItem(probe);
   }catch{state.storage=false}
   if(state.storage){
+   state.notes=cleanNotes(read(KEY_NOTES_ANON));
    const current=read(KEY_PROGRESS);let historical=current;
    if(!current){const legacy=read(LEGACY_KEY);if(legacy)historical=legacy}
    if(historical)state.progress=cleanProgress(historical);
