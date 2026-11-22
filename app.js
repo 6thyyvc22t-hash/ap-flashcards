@@ -6,6 +6,11 @@ const KEY_DRAFT='ap-flashcards-deck-draft-v2';
 const LEGACY_KEY='ap-kamoku-b-150-2026-v1';
 const BACKUP_KIND='ap-flashcards-progress';
 const DECK_ID='ap-kamoku-b';
+const KEY_FIREBASE_CONFIG='ap-flashcards-firebase-config-v1';
+const KEY_LOCAL_SNAPSHOT='ap-flashcards-precloud-backup-v1';
+const KEY_CLOUD_ACCOUNT='ap-flashcards-last-cloud-account-v1';
+let cloud=null,cloudUser=null,cloudStarting=false,preCloudSnapshot=null;
+
 const fields=['category','question','answer','explanation','point'];
 const state={base:null,deck:null,draft:null,progress:{},storage:false,category:'ALL',mode:'ordered',current:null,answerShown:false,visibleIds:[],conflict:null};
 const idIndex=()=>new Map(state.deck.cards.map((x,i)=>[x.id,i]));
@@ -42,7 +47,7 @@ function clearAlert(id){$(id).classList.add('hidden');$(id).textContent='';}
 function store(key,value){if(!state.storage)return false;try{localStorage.setItem(key,JSON.stringify(value));return true;}catch{state.storage=false;updateSaveNotice();return false;}}
 function read(key){try{return JSON.parse(localStorage.getItem(key)||'null');}catch{return null;}}
 function updateSaveNotice(){
- const txt=state.storage?'✓ 学習記録と端末の編集内容はこのブラウザ内に保存されます。定期的にJSONバックアップを取ってください。':'⚠ この表示環境では自動保存できません。必ずJSONを書き出してください。';
+ const txt=state.storage?(cloudUser?'✓ 学習記録を端末にも保存し、Firebaseクラウドと同期します。未送信がある場合は下の同期状態をご確認ください。':'✓ 学習記録と端末の編集内容はこのブラウザ内に保存されます。Firebaseログイン後に端末間で同期できます。'):'⚠ この表示環境では端末への自動保存ができません。必ずJSONを書き出してください。';
  $('saveNotice').textContent=txt;$('saveNotice').className='alert '+(state.storage?'note':'warning');
 }
 function setDraft(deck){
@@ -102,7 +107,15 @@ function render(){
  for(const id of ['skipBtn','prevBtn','nextBtn','showBtn'])$(id).disabled=!has;
 }
 function toggleAnswer(){if(!state.current)return;state.answerShown=!state.answerShown;render();}
-function grade(kind){if(!state.current||!state.answerShown)return;const id=state.current,x=r(id);state.progress[id]={seen:true,correct:positive(x.correct)+(kind==='correct'?1:0),incorrect:positive(x.incorrect)+(kind==='wrong'?1:0),needsReview:kind==='wrong'};store(KEY_PROGRESS,state.progress);nextCard(1,true);}
+function grade(kind){
+ if(!state.current||!state.answerShown)return;
+ const id=state.current,x=r(id);
+ state.progress[id]={seen:true,correct:positive(x.correct)+(kind==='correct'?1:0),incorrect:positive(x.incorrect)+(kind==='wrong'?1:0),needsReview:kind==='wrong'};
+ store(KEY_PROGRESS,state.progress);
+ if(cloudUser&&cloud&&!cloud.queueGrade(id,kind))showCloudStatus('クラウドへの送信待ち記録を保存できませんでした。JSONバックアップを取ってください。',true);
+ nextCard(1,true);
+}
+
 function fillFilters(){
  const currentCategory=state.category;
  $('categoryFilter').replaceChildren(new Option('全分野','ALL'),...state.deck.categories.map(c=>new Option(c+'（'+state.deck.cards.filter(x=>x.category===c).length+'問）',c)));
@@ -121,7 +134,11 @@ function importProgress(file){
   if(obj.type===BACKUP_KIND&&obj.deckId===DECK_ID)progress=cleanProgress(obj.progress);
   else if(obj.type==='ap-kamokuB-150-progress')progress=cleanProgress(obj.ratings);
   else throw Error('対応しない学習記録ファイルです');
-  if(confirm('現在の学習記録を読み込んだ内容で置き換えますか？')){state.progress=progress;store(KEY_PROGRESS,progress);resetSelection();alert('学習記録を復元しました。');}
+  if(cloudUser&&cloud){
+    if(!confirm('クラウド上の学習記録をこのJSONで置き換えます。iPad・iPhoneの記録も変更されます。実行しますか？'))return;
+    cloud.replaceProgress(progress).then(()=>alert('クラウドの学習記録を復元しました。各端末へ自動反映されます。')).catch(e=>alert('クラウドへの復元に失敗：'+e.message));
+  }else if(confirm('現在の端末の学習記録を読み込んだ内容で置き換えますか？')){state.progress=progress;store(KEY_PROGRESS,progress);resetSelection();alert('学習記録を端末に復元しました。');}
+
  }).catch(e=>alert('学習記録の読み込みに失敗しました：'+e.message));
 }
 function exportDeck(){const deck={...state.deck,revision:new Date().toISOString()};fileDownload(deck,'questions.json');}
@@ -201,14 +218,115 @@ function initHandlers(){
  $('modeFilter').addEventListener('change',e=>{state.mode=e.target.value;resetSelection()});
  $('exportProgress').addEventListener('click',exportProgress);
  $('importProgress').addEventListener('change',e=>{importProgress(e.target.files[0]);e.target.value=''});
- $('resetProgress').addEventListener('click',()=>{if(confirm('正誤・学習済み・復習対象をすべてリセットしますか？')){state.progress={};store(KEY_PROGRESS,state.progress);resetSelection()}});
+ $('resetProgress').addEventListener('click',async()=>{
+  const msg=cloudUser?'クラウドの全学習記録をリセットします。iPad・iPhone両方に反映されます。取り消せません。実行しますか？':'この端末の正誤・学習済み・復習対象をすべてリセットしますか？';
+  if(!confirm(msg))return;
+  if(cloudUser&&cloud){try{await cloud.reset();alert('クラウドの記録をリセットしました。')}catch(e){alert('リセットに失敗：'+e.message)}}
+  else{state.progress={};store(KEY_PROGRESS,state.progress);resetSelection()}
+ });
+
  $('addCard').addEventListener('click',()=>showEditor());$('exportDeck').addEventListener('click',exportDeck);
  $('importDeck').addEventListener('change',e=>{importDeck(e.target.files[0]);e.target.value=''});
  $('discardDraft').addEventListener('click',discardDraft);
  $('manageSearch').addEventListener('input',renderManageList);
  $('editorForm').addEventListener('submit',submitEditor);
  $('cancelEdit').addEventListener('click',hideEditor);
+ $('authSignIn').addEventListener('click',()=>authenticate(false));
+ $('authSignUp').addEventListener('click',()=>authenticate(true));
+ $('cloudLogout').addEventListener('click',async()=>{if(!cloud)return;try{await cloud.signOut()}catch(e){showCloudStatus('ログアウト失敗：'+e.message,true)}});
+ $('cloudMigrate').addEventListener('click',migrateOldProgress);
+ $('cloudExportLegacy').addEventListener('click',()=>{if(preCloudSnapshot)fileDownload({type:BACKUP_KIND,version:2,deckId:DECK_ID,exportedAt:new Date().toISOString(),progress:preCloudSnapshot},'ap-flashcards-before-cloud.json')});
+ $('firebaseApplyConfig').addEventListener('click',()=>{
+  try{const v=parseFirebaseConfig($('firebaseConfigInput').value);if(!state.storage)throw Error('端末ストレージが利用できないため設定を保存できません');store(KEY_FIREBASE_CONFIG,v);alert('Firebase設定を保存しました。画面を再読み込みして接続します。');location.reload();}
+  catch(e){alert('Firebase設定を確認してください：'+e.message)}
+ });
+ $('firebaseExportConfig').addEventListener('click',()=>{
+   try{const v=parseFirebaseConfig($('firebaseConfigInput').value);fileDownload(v,'firebase-config.json')}
+   catch(e){alert('設定JSONを入力してください：'+e.message)}
+ });
+ $('firebaseClearConfig').addEventListener('click',()=>{
+  if(!confirm('この端末だけに保存したFirebase設定を解除しますか？（GitHub公開版の設定は変更されません）'))return;
+  try{localStorage.removeItem(KEY_FIREBASE_CONFIG)}catch{}location.reload();
+ });
 }
+
+function showCloudStatus(message,isError=false){
+ const node=$('cloudStatus');node.textContent=message;node.classList.toggle('errorText',isError);node.classList.toggle('okText',!isError&&message.startsWith('✓'));
+ $('cloudIndicator').textContent=isError?'⚠':(message.startsWith('✓')?'●':'◯');
+}
+function parseFirebaseConfig(text){
+ // Firebase's Web config is PUBLIC configuration, NOT an admin-service-account credential.
+ let v=text;
+ if(typeof text==='string'){
+  let raw=text.trim();
+  // Also accept the `const firebaseConfig = { ... };` snippet supplied by Firebase Console.
+  raw=raw.replace(/^(?:const|let|var)\s+firebaseConfig\s*=\s*/, '').replace(/;\s*$/, '');
+  raw=raw.replace(/([,{]\s*)([A-Za-z_$][\w$]*)\s*:/g, '$1"$2"');
+  v=JSON.parse(raw);
+ }
+ if(!v||typeof v!=='object'||Array.isArray(v)||!['apiKey','authDomain','projectId','appId'].every(k=>typeof v[k]==='string'&&v[k].trim()))throw Error('apiKey・authDomain・projectId・appIdを含むJSONが必要です');
+ if(v.private_key||v.privateKey||v.client_email)throw Error('管理者の秘密鍵やサービスアカウント情報は入力しないでください');
+ return Object.fromEntries(['apiKey','authDomain','projectId','appId','messagingSenderId','storageBucket','measurementId'].filter(k=>typeof v[k]==='string'&&v[k].trim()).map(k=>[k,v[k].trim()]));
+}
+function hasScores(progress){return Object.values(progress||{}).some(v=>v&&(v.seen||positive(v.correct)||positive(v.incorrect)||v.needsReview));}
+function updateMigration(remoteCount){
+ const have=hasScores(preCloudSnapshot);
+ $('cloudMigrate').classList.toggle('hidden',!(cloudUser&&cloud?.remoteLoaded&&remoteCount===0&&have&&!cloud.hasPending));
+ $('cloudExportLegacy').classList.toggle('hidden',!have);
+ const info=$('cloudMigrationInfo');
+ if(cloudUser&&have){info.classList.remove('hidden');info.textContent=remoteCount===0?'この端末にクラウド導入前の学習記録が見つかりました。「以前の成績を移行」で初回のみ取り込めます。':'この端末の古い学習記録を別に保護しています。クラウドに既に成績があるため、自動で合算しません（重複防止）。必要ならJSONに保存できます。';}
+ else info.classList.add('hidden');
+}
+async function migrateOldProgress(){
+ if(!cloud||!cloudUser||!preCloudSnapshot)return;
+ if(!confirm('この端末に残る以前の成績をクラウドへ初回移行します。すでにクラウドに成績がある場合は実行できません。続けますか？'))return;
+ try{const n=await cloud.migrateLocal(preCloudSnapshot);alert(n+'問分の既存学習記録をクラウドに移行しました。');updateMigration(n)}
+ catch(e){alert('移行失敗：'+e.message)}
+}
+async function authenticate(register){
+ if(!cloud){showCloudStatus('先にFirebaseの設定を行ってください',true);return}
+ const email=$('authEmail').value.trim(),password=$('authPassword').value;
+ if(!email||password.length<6){showCloudStatus('メールアドレスと6文字以上のパスワードを入力してください',true);return}
+ for(const id of ['authSignIn','authSignUp'])$(id).disabled=true;
+ try{if(register)await cloud.signUp(email,password);else await cloud.signIn(email,password);$('authPassword').value=''}
+ catch(e){const errors={'auth/email-already-in-use':'このメールアドレスは登録済みです。ログインしてください。','auth/invalid-credential':'メールアドレスまたはパスワードが正しくありません。','auth/operation-not-allowed':'Firebaseコンソールでメール/パスワード認証を有効にしてください。','auth/unauthorized-domain':'Firebase Authenticationの承認済みドメインに6thyyvc22t-hash.github.ioを追加してください。','auth/weak-password':'パスワードは6文字以上で設定してください。'};showCloudStatus(errors[e.code]||'認証エラー：'+(e.code||e.message),true)}
+ finally{for(const id of ['authSignIn','authSignUp'])$(id).disabled=false}
+}
+async function initCloud(){
+ if(cloudStarting)return;cloudStarting=true;
+ let config=read(KEY_FIREBASE_CONFIG);
+ if(!config){try{const response=await fetch('firebase-config.json',{cache:'no-store'});if(response.ok)config=await response.json()}catch{}}
+ try{
+  config=parseFirebaseConfig(config);
+  $('firebaseConfigInput').value=JSON.stringify(config,null,2);
+ }catch{
+  showCloudStatus('Firebaseは未設定です。現在は端末内の学習記録を使用中です。下の「Firebase設定」を開いてください。');
+  $('cloudSetup').open=true;return;
+ }
+ try{
+   showCloudStatus('Firebaseに接続しています…');
+   const {createCloudSync}=await import('./cloud-sync.js');
+   cloud=await createCloudSync(config,{
+     onUser(user){
+       cloudUser=user;
+       $('cloudAuthPanel').classList.toggle('hidden',!!user);$('cloudUserPanel').classList.toggle('hidden',!user);
+       $('cloudUser').textContent=user?.email||'未ログイン';
+       if(user){
+         // Preserve the original device-only record once; never silently merge two devices.
+         if(!read(KEY_CLOUD_ACCOUNT)&&!read(KEY_LOCAL_SNAPSHOT)&&hasScores(state.progress))store(KEY_LOCAL_SNAPSHOT,state.progress);
+         preCloudSnapshot=read(KEY_LOCAL_SNAPSHOT);
+         store(KEY_CLOUD_ACCOUNT,user.uid);
+       }else {preCloudSnapshot=read(KEY_LOCAL_SNAPSHOT);updateMigration(0)}
+       updateSaveNotice();
+     },
+     onProgress(progress,remoteCount){
+       state.progress=cleanProgress(progress);store(KEY_PROGRESS,state.progress);render();updateMigration(remoteCount);
+     },
+     onStatus(message,isError){showCloudStatus(message,isError)}
+   });
+ }catch(e){showCloudStatus('Firebaseへの接続失敗：'+e.message+'。設定や通信を確認してください。',true)}
+}
+
 async function init(){
  try{
   const res=await fetch('questions.json',{cache:'no-store'});
@@ -239,7 +357,7 @@ async function init(){
     }catch(e){showAlert('syncNotice','端末の問題下書きを読み込めませんでした：'+e.message)}
    }
   }
-  updateSaveNotice();initHandlers();updateView();$('studyApp').classList.remove('hidden');
+  updateSaveNotice();initHandlers();updateView();$('studyApp').classList.remove('hidden');initCloud();
  }catch(error){
   console.error(error);
   showAlert('loadError','問題データを読み込めませんでした。HTMLを「ファイル」アプリで直接開くと正常に動作しない場合があります。index.html・app.js・styles.css・questions.jsonを同じGitHub Pagesリポジトリに置き、Safariで公開URLを開いてください。（'+error.message+'）');

@@ -65,3 +65,50 @@
 ## データ出典
 
 内容はAI予想問題で、添付の過去問題PDFから着想を得た問題形式ですが原文転載ではありません。試験出題の保証はありません。
+
+---
+
+# iPad・iPhone間のクラウド自動同期（Firebase）
+
+更新日：2026-11-23。以前の「端末内のみ」の方式を拡張。単語帳は **設定前もローカルで利用可能**。GitHub PagesにアップロードしただけではFirebaseとの同期は始まりません。
+
+## 1. Firebaseプロジェクトを作成する（本人操作が必要）
+
+1. https://console.firebase.google.com/ を開き、Googleアカウントでログインし、「プロジェクトを追加」を押す。
+2. 任意のプロジェクト名（例：`ap-study-sync-2026`）を指定する。Googleアナリティクスは不要ならオフでよい。原則として無料の **Spark** プランで始める。
+3. プロジェクト概要の「ウェブ（</>）」アプリを登録し、表示された **Firebase SDK の `firebaseConfig`** をコピーする。**Firebase Admin SDKの秘密鍵（サービスアカウントJSON）は絶対に使わない。**
+4. 「Authentication」→「Sign-in method」→「メール / パスワード（Email/Password）」を有効にする。メールリンク認証は不要。
+5. 「Authentication」→「Settings」→「Authorized domains」に `6thyyvc22t-hash.github.io` を追加する（必要な場合）。`https://` や `/ap-flashcards/` は付けない。
+6. 「Firestore Database」→「データベースを作成」。無料プランで選べるリージョンを選択する。**セキュリティルールを公開モードのまま運用しない。**
+7. 「Firestore Database」→「ルール（Rules）」に、このリポジトリの [`firestore.rules`](./firestore.rules) の **全文** を貼り付けて **公開（Publish）** する。これにより各ユーザーは自分のUIDの学習記録だけ読み書きできる。
+
+## 2. FirebaseのWeb設定を単語帳へ反映
+
+方法A（最も簡単）：単語帳の「Firebase設定」を開き、コピーした `const firebaseConfig = {...};` を貼り付けて「この端末に設定して接続」を押す。この設定は **その端末だけ** に保存される。設定がうまくいけば「設定ファイルを書き出す」で `firebase-config.json` を取得し、GitHubリポジトリの最上位の同名ファイルに上書きする。
+
+方法B（両端末に一度に適用）：Firebase Web設定の `apiKey`・`authDomain`・`projectId`・`appId` 等を、GitHubリポジトリの `firebase-config.json` に保存する。次回から全端末が同じFirebaseプロジェクトに接続する。**Web設定のAPIキーは公開用のクライアント設定**であり、データへの権限は認証＋Firestoreルールが担う。秘密鍵やFirebaseサービスアカウントは決してコミットしない。
+
+## 3. iPad・iPhoneで同じアカウントにログイン
+
+1. `https://6thyyvc22t-hash.github.io/ap-flashcards/` をSafariで開く。
+2. iPadで「初回アカウント作成」を押し、自分のメールアドレスと6文字以上のパスワードを登録する。
+3. iPhoneでは **同じメールアドレスとパスワードでログイン**する。認証完了後「✓ クラウドと同期済み」を確認する。
+4. どちらかで1問採点し、もう一方のSafariでも正答率・正誤回数が変わるかを試す。通信状態によっては少し遅れて反映される。
+
+## 4. 旧学習記録の移行・トラブル対応
+
+- Firebaseを初めて導入する端末で旧成績が見つかり、クラウドにまだ成績がなければ「この端末の以前の成績を移行」を1回だけ実行する。**両端末の旧記録を自動で足し合わせない**（重複を防ぐため）。クラウド側に記録がある場合は、旧記録を「移行前の成績を保存」でJSONバックアップできる。
+- 同じ問題をiPadとiPhoneで採点しても、Firestoreの `increment` と操作IDで合計回数を管理する。二重送信は操作IDで防止する。
+- オフラインで採点した操作はSafariのlocalStorageに送信待ちとして保存し、再接続時に再送する。**ブラウザデータ消去・端末故障時には未送信記録が消える**可能性があるため、重要な時はJSONバックアップも取得する。
+- 初期問題データ150問と追加・削除は従来どおり `questions.json` でGitHubに管理し、正誤記録のみFirebaseに保存する。問題IDは不変。
+- 「学習記録をリセット」「学習記録を読み込む」はクラウドログイン中は**両端末の記録に反映**する。作業前に他端末の未同期の採点を同期させ、必要に応じてバックアップする。
+- Firebaseの `firebase-config.json` が未入力（空欄）のうちはクラウド接続しない。サイト自体はローカル学習用として引き続き動作する。
+
+## データ配置・安全性
+
+- **GitHub Pages（公開）**: `index.html`, `app.js`, `cloud-sync.js`, `styles.css`, `questions.json`, `firebase-config.json`
+- **Firebase（非公開の成績）**: `users/{uid}/cards/{cardId}`（累積成績）、`users/{uid}/operations/{opId}`（一度だけ加算した操作ID）
+- **端末内**: クラウド未送信キュー、問題データの未公開下書き、旧成績のバックアップ
+- **Firestoreルール**: `firestore.rules` をFirebase Consoleで公開して初めて有効になる。GitHubにファイルを置くだけでは適用されない。
+
+Firebaseの料金・利用枠はFirebase管理画面の最新情報を確認する。匿名認証でなくメール/パスワード認証を用い、iPadとiPhoneで同じUIDに紐付ける。メールアドレスやパスワードをGitHubリポジトリに入れない。
