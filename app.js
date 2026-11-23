@@ -214,6 +214,31 @@ function updateDraftNotice(){
  updateDeckMigration();
 }
 function getPool(){return state.deck.cards.filter(c=>(state.category==='ALL'||c.category===state.category)&&(state.mode==='missed'?r(c.id).needsReview:state.mode==='new'?!r(c.id).seen:true)).map(c=>c.id);}
+function renderJump(pool){
+ const group=$('jumpGroup'),select=$('jumpSelect'),button=$('jumpBtn');
+ const sequential=state.mode!=='random';
+ group.classList.toggle('hidden',!sequential);
+ if(!sequential)return;
+ const poolKey=pool.join('|');
+ if(select.dataset.poolKey!==poolKey){
+  const byId=new Map(state.deck.cards.map(c=>[c.id,c]));
+  select.replaceChildren(...pool.map((id,index)=>{
+   const question=byId.get(id)?.question||'';
+   const label=question.length>36?question.slice(0,36)+'…':question;
+   return new Option(`${index+1} / ${pool.length}（Q${id}） ${label}`,id);
+  }));
+  select.dataset.poolKey=poolKey;
+ }
+ select.disabled=button.disabled=pool.length===0;
+ select.value=state.current||'';
+ $('jumpHelp').textContent=pool.length?`現在の条件の全${pool.length}問から選択できます。移動しても学習記録は変わりません。`:'現在の条件に合う問題がありません。';
+}
+function jumpToSelected(){
+ if(state.mode==='random')return;
+ const id=$('jumpSelect').value;
+ if(!id||!getPool().includes(id))return;
+ state.current=id;state.answerShown=false;render();
+}
 function chooseRandom(ids,exclude){const eligible=ids.length>1?ids.filter(id=>id!==exclude):ids;return eligible[Math.floor(Math.random()*eligible.length)]||null;}
 function nextCard(step=1,wasGraded=false){
  const pool=getPool();if(!pool.length){state.current=null;render();return;}
@@ -243,6 +268,7 @@ function renderStats(){
 function render(){
  renderStats();const pool=getPool();state.visibleIds=pool;
  if(!pool.includes(state.current)){state.current=pool[0]||null;state.answerShown=false;}
+ renderJump(pool);
  const card=state.deck.cards.find(x=>x.id===state.current),has=!!card;
  $('card').classList.toggle('hidden',!has);$('emptyMessage').classList.toggle('hidden',has);
  $('questionIndex').textContent=has?'Q'+card.id:'該当0問';
@@ -277,7 +303,7 @@ function fillFilters(){
  $('categoryFilter').value=state.deck.categories.includes(currentCategory)?currentCategory:'ALL';state.category=$('categoryFilter').value;
  $('editCategory').replaceChildren(...state.deck.categories.map(c=>new Option(c,c)));
 }
-function updateView(){fillFilters();updateDraftNotice();resetSelection();renderManageList();}
+function updateView(){fillFilters();updateDraftNotice();$('jumpSelect').dataset.poolKey='';resetSelection();renderManageList();}
 function fileDownload(obj,name){
  const url=URL.createObjectURL(new Blob([JSON.stringify(obj,null,2)+'\n'],{type:'application/json;charset=utf-8'}));
  const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),2000);
@@ -401,6 +427,7 @@ function initHandlers(){
  $('importMemos').addEventListener('change',e=>{importMemos(e.target.files[0]);e.target.value=''});
  $('categoryFilter').addEventListener('change',e=>{state.category=e.target.value;resetSelection()});
  $('modeFilter').addEventListener('change',e=>{state.mode=e.target.value;resetSelection()});
+ $('jumpBtn').addEventListener('click',jumpToSelected);
  $('exportProgress').addEventListener('click',exportProgress);
  $('importProgress').addEventListener('change',e=>{importProgress(e.target.files[0]);e.target.value=''});
  $('resetProgress').addEventListener('click',async()=>{
