@@ -95,10 +95,11 @@
     </details>
 
     <details class="tools panel" id="manageTools"><summary>問題の追加・編集・削除・復元</summary>
-      <p class="small">この画面の変更は最初、この端末の下書きとして保存されます。「削除」は復元可能な保管、「完全削除」は復元不可です。全端末に反映するには更新した <code>questions.json</code> をダウンロードしてGitHubにアップロードしてください。</p>
+      <p class="small">この画面の変更は最初、この端末の下書きとして保存されます。「保管」は復元できます。「完全削除」は問題一覧から直接実行でき、確認後は復元できません。全端末に反映するには更新した <code>questions.json</code> をダウンロードしてGitHubにアップロードしてください。</p>
       <div class="inlineActions"><button id="addCard" type="button">＋ 新しい問題</button><button id="exportDeck" type="button">問題データを書き出す</button><label class="likeButton" for="importDeck">問題データを読み込む</label><input id="importDeck" type="file" accept=".json,application/json" class="visuallyHidden"><button id="discardDraft" class="danger" type="button">端末の下書きを破棄</button></div>
       <div class="manageStats"><span id="draftStatus">公開版を使用中</span><span id="archivedCount">保管中：0問</span></div>
       <label class="fullWidth">管理画面で問題を探す<input id="manageSearch" type="search" placeholder="ID・用語・問題文で検索"></label>
+      <p id="manageResultCount" class="small" aria-live="polite"></p>
       <div id="manageList" class="manageList"></div>
       <h3 class="subheading">削除済み（復元／完全削除）</h3>
       <div id="archiveList" class="manageList"></div>
