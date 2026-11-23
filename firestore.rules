@@ -26,6 +26,55 @@ service cloud.firestore {
         && request.resource.data.updatedAt == request.time;
       allow delete: if false;
     }
+    // Per-account card overrides. These never modify the public questions.json.
+    match /users/{userId}/deckChanges/{cardId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create, update: if request.auth != null && request.auth.uid == userId
+        && cardId.matches('^[A-Za-z0-9_-]{1,64}
+      allow get: if request.auth != null && request.auth.uid == userId;
+      allow list: if false;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['cardId','kind','createdAt'])
+        && request.resource.data.cardId is string
+        && request.resource.data.cardId.matches('^[A-Za-z0-9_-]{1,64}$')
+        && request.resource.data.kind in ['correct','wrong']
+        && request.resource.data.createdAt is timestamp;
+      allow update, delete: if false;
+    }
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+})
+        && request.resource.data.keys().hasOnly(['status','card','updatedAt'])
+        && request.resource.data.keys().hasAll(['status','updatedAt'])
+        && request.resource.data.status in ['active','archived','purged']
+        && request.resource.data.updatedAt == request.time
+        && (request.resource.data.status == 'purged'
+          ? !('card' in request.resource.data)
+          : ('card' in request.resource.data
+            && request.resource.data.card is map
+            && request.resource.data.card.keys().hasOnly(['id','section_no','category','question','answer','explanation','point','origin'])
+            && request.resource.data.card.keys().hasAll(['id','section_no','category','question','answer','explanation','point','origin'])
+            && request.resource.data.card.id == cardId
+            && request.resource.data.card.section_no is int
+            && request.resource.data.card.section_no >= 0
+            && request.resource.data.card.category is string
+            && request.resource.data.card.category in ['情報セキュリティ','プロジェクトマネジメント','サービスマネジメント','経営戦略','システム監査']
+            && request.resource.data.card.question is string
+            && request.resource.data.card.question.size() > 0
+            && request.resource.data.card.question.size() <= 400
+            && request.resource.data.card.answer is string
+            && request.resource.data.card.answer.size() > 0
+            && request.resource.data.card.answer.size() <= 400
+            && request.resource.data.card.explanation is string
+            && request.resource.data.card.explanation.size() <= 600
+            && request.resource.data.card.point is string
+            && request.resource.data.card.point.size() <= 600
+            && request.resource.data.card.origin is string
+            && request.resource.data.card.origin.size() <= 1000));
+      allow delete: if false;
+    }
     match /users/{userId}/operations/{operationId} {
       allow get: if request.auth != null && request.auth.uid == userId;
       allow list: if false;

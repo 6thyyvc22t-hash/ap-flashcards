@@ -6,14 +6,14 @@
   <meta name="color-scheme" content="dark">
   <title>応用情報 科目B｜デジタル単語帳</title>
   <link rel="stylesheet" href="styles.css">
-  <script src="app.js" defer></script>
+  <script src="app.js?v=deck-sync-20261123" defer></script>
 </head>
 <body>
 <main class="page">
   <header class="hero">
     <p class="eyebrow">応用情報技術者試験・科目B</p>
     <div class="heroRow"><h1>デジタル単語帳</h1><span class="heroCount" id="deckCount">準備中</span></div>
-    <p class="muted">問題の追加・編集・削除・復元に対応。学習記録は問題IDごとに保持。Firebase認証でiPad・iPhone間の学習記録・メモの同期に対応。</p>
+    <p class="muted">問題の追加・編集・削除・復元に対応。学習記録は問題IDごとに保持。Firebase認証でiPad・iPhone間の学習記録・メモ・問題の変更を同期。</p>
   </header>
   <noscript><div class="alert error">JavaScriptが無効です。GitHub Pagesで公開したURLをSafariから開いてください。</div></noscript>
   <div id="loadError" class="alert error hidden" role="alert"></div>
@@ -23,6 +23,7 @@
   <section id="cloudPanel" class="panel cloudPanel" aria-label="Firebaseクラウド同期">
     <div class="cloudHeader"><strong><span id="cloudIndicator">◯</span> クラウド同期</strong><span id="cloudUser" class="small">未ログイン</span></div>
     <p class="small" id="cloudStatus" role="status">Firebase設定を確認中…</p>
+    <p class="small" id="deckCloudStatus" role="status">問題データのクラウド同期を確認中…</p>
     <div id="cloudAuthPanel" class="hidden">
       <label>メールアドレス<input id="authEmail" type="email" inputmode="email" autocomplete="username" placeholder="メールアドレス"></label>
       <label>パスワード<input id="authPassword" type="password" autocomplete="current-password" placeholder="6文字以上"></label>
@@ -30,8 +31,9 @@
       <p class="small">両端末で同じメールアドレスとパスワードを使用します。パスワードをサイトに保存しません。</p>
     </div>
     <div id="cloudUserPanel" class="hidden">
-      <div class="inlineActions"><button type="button" id="cloudLogout" class="quiet">ログアウト</button><button type="button" id="cloudMigrate" class="quiet hidden">この端末の以前の成績を移行</button><button type="button" id="cloudExportLegacy" class="quiet hidden">移行前の成績を保存</button><button type="button" id="cloudMigrateNotes" class="quiet hidden">端末メモを初回同期</button></div>
+      <div class="inlineActions"><button type="button" id="cloudLogout" class="quiet">ログアウト</button><button type="button" id="cloudMigrate" class="quiet hidden">この端末の以前の成績を移行</button><button type="button" id="cloudExportLegacy" class="quiet hidden">移行前の成績を保存</button><button type="button" id="cloudMigrateNotes" class="quiet hidden">端末メモを初回同期</button><button type="button" id="cloudMigrateDeck" class="quiet hidden">以前の端末下書きをクラウドへ移行</button></div>
       <p id="cloudMigrationInfo" class="small hidden"></p>
+      <p id="cloudDeckMigrationInfo" class="small hidden"></p>
     </div>
     <details id="cloudSetup" class="cloudSetup"><summary>Firebase設定（初回設定時のみ）</summary>
       <p class="small">Firebase管理画面で取得したWebアプリの設定JSONを入力します。設定はブラウザ内に保存されます。全端末で使うには <code>firebase-config.json</code> をGitHubに公開してください。APIキーは公開前提の識別情報ですが、データへのアクセスはFirestoreセキュリティルールで制限します。</p>
@@ -95,7 +97,7 @@
     </details>
 
     <details class="tools panel" id="manageTools"><summary>問題の追加・編集・削除・復元</summary>
-      <p class="small">この画面の変更は最初、この端末の下書きとして保存されます。「保管」は復元できます。「完全削除」は問題一覧から直接実行でき、確認後は復元できません。全端末に反映するには更新した <code>questions.json</code> をダウンロードしてGitHubにアップロードしてください。</p>
+      <p class="small"><strong>ログイン中：</strong>このアカウントでの追加・編集・保管・削除はFirebaseでiPhone・iPad間に自動同期されます。<strong>未ログイン：</strong>端末内の下書きのみです。以前の端末下書きはログイン後に専用ボタンから移行してください。GitHubの公開問題そのものは変更しません。</p>
       <div class="inlineActions"><button id="addCard" type="button">＋ 新しい問題</button><button id="exportDeck" type="button">問題データを書き出す</button><label class="likeButton" for="importDeck">問題データを読み込む</label><input id="importDeck" type="file" accept=".json,application/json" class="visuallyHidden"><button id="discardDraft" class="danger" type="button">端末の下書きを破棄</button></div>
       <div class="manageStats"><span id="draftStatus">公開版を使用中</span><span id="archivedCount">保管中：0問</span></div>
       <label class="fullWidth">管理画面で問題を探す<input id="manageSearch" type="search" placeholder="ID・用語・問題文で検索"></label>
@@ -116,7 +118,7 @@
       </form>
     </details>
   </section>
-  <footer class="footer">科目B対策・AI予想問題。問題データはGitHub Pagesで共有。学習履歴はログイン時にFirebaseへ同期し、問題IDごとに保持。</footer>
+  <footer class="footer">科目B対策・AI予想問題。GitHub Pagesは共通の問題データを公開し、ログイン中の個人用変更・学習記録・メモはFirebaseに保存します。</footer>
 </main>
 </body>
 </html>
