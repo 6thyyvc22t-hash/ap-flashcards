@@ -235,16 +235,19 @@ function renderManageList(){
    const title=document.createElement('div');title.className='manageText';
    const strong=document.createElement('strong');strong.textContent='Q'+c.id+' ｜ '+c.category;
    const p=document.createElement('div');p.textContent=c.question;title.append(strong,p);row.append(title);
-   const buttons=document.createElement('div');buttons.style.display='flex';buttons.style.gap='5px';
+   const buttons=document.createElement('div');buttons.className='manageActions';
    if(archived){const restore=document.createElement('button');restore.type='button';restore.textContent='復元';restore.addEventListener('click',()=>restoreCard(c.id));const hard=document.createElement('button');hard.type='button';hard.className='danger';hard.textContent='完全削除';hard.addEventListener('click',()=>purgeCard(c.id));buttons.append(restore,hard)}
    else{
      const edit=document.createElement('button');edit.type='button';edit.textContent='編集';edit.addEventListener('click',()=>showEditor(c));
-     const del=document.createElement('button');del.type='button';del.textContent='削除';del.className='danger';del.addEventListener('click',()=>deleteCard(c.id));buttons.append(edit,del);
+     const del=document.createElement('button');del.type='button';del.textContent='保管';del.className='danger';del.addEventListener('click',()=>deleteCard(c.id));
+     const hard=document.createElement('button');hard.type='button';hard.textContent='完全削除';hard.className='danger';hard.addEventListener('click',()=>purgeCard(c.id));
+     buttons.append(edit,del,hard);
    }row.append(buttons);return row;
  };
- const rows=sorted.slice(0,50).map(c=>makeRow(c,false));
+ const rows=sorted.map(c=>makeRow(c,false));
  $('manageList').replaceChildren(...rows);
- if(sorted.length>50){const small=document.createElement('p');small.className='small';small.textContent=`検索結果 ${sorted.length}問のうち50問を表示しています。絞り込んでください。`;$('manageList').append(small)}
+ $('manageResultCount').textContent=`${sorted.length}問を表示中（全${state.deck.cards.length}問）。`;
+ if(!sorted.length){const p=document.createElement('p');p.className='small';p.textContent='該当する問題はありません。';$('manageList').append(p)}
  const archive=state.deck.archivedCards.filter(c=>!q||[c.id,c.question,c.answer].join(' ').toLowerCase().includes(q));
  $('archiveList').replaceChildren(...archive.map(c=>makeRow(c,true)));
  if(!archive.length){const p=document.createElement('p');p.className='small';p.textContent='該当する削除済み問題はありません。';$('archiveList').append(p)}
@@ -275,9 +278,16 @@ function restoreCard(id){const c=state.deck.archivedCards.find(c=>c.id===id);if(
  // Restore the original numeric card sequence, including older IDs.
  deck.cards.sort((a,b)=>Number(a.id)-Number(b.id));setDraft(deck);
 }
-function purgeCard(id){const c=state.deck.archivedCards.find(c=>c.id===id);if(!c)return;
- if(!confirm(`Q${id}を完全削除しますか？\n問題文・正答を問題データから除き、復元できなくなります。学習履歴はブラウザ内に残ります。`))return;
- const deck=structuredClone(state.deck);deck.archivedCards=deck.archivedCards.filter(c=>c.id!==id);deck.retiredIds.push(id);setDraft(deck);
+function purgeCard(id){
+ // Active cards can be permanently removed directly, without first archiving them.
+ const c=state.deck.cards.find(c=>c.id===id)||state.deck.archivedCards.find(c=>c.id===id);
+ if(!c)return;
+ if(!confirm(`Q${id}「${c.question}」を完全削除しますか？\n問題文・正答を問題データから除き、復元できなくなります。\n公開版への反映にはquestions.jsonのGitHub更新が必要です。学習履歴・メモは別管理で残ります。`))return;
+ const deck=structuredClone(state.deck);
+ deck.cards=deck.cards.filter(c=>c.id!==id);
+ deck.archivedCards=deck.archivedCards.filter(c=>c.id!==id);
+ if(!deck.retiredIds.includes(id))deck.retiredIds.push(id);
+ setDraft(deck);
 }
 function discardDraft(){if(!state.draft)return;
  if(!confirm('この端末で編集した問題データを破棄し、GitHub公開版に戻しますか？ 学習記録は残ります。'))return;
