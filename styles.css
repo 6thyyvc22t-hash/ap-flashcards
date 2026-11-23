@@ -14,3 +14,11 @@
 .memoPanel .small{line-height:1.6}
 .memoPanel #memoStatus{flex:1;min-width:145px}
 .memoPanel button:disabled{opacity:.5}
+
+/* Jump to a chosen card while keeping the current study filter and progress */
+.jumpGroup{grid-column:1/-1;border-top:1px solid var(--line);padding-top:10px}
+.jumpRow{display:flex;align-items:stretch;gap:8px;margin-top:6px}
+.jumpRow select{flex:1;min-width:0}
+.jumpRow button{flex:0 0 auto;white-space:nowrap}
+.jumpGroup .small{margin:6px 0 0;line-height:1.4}
+@media(max-width:600px){.jumpRow button{padding:10px 8px;font-size:12px}}
