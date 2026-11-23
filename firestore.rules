@@ -30,22 +30,7 @@ service cloud.firestore {
     match /users/{userId}/deckChanges/{cardId} {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow create, update: if request.auth != null && request.auth.uid == userId
-        && cardId.matches('^[A-Za-z0-9_-]{1,64}
-      allow get: if request.auth != null && request.auth.uid == userId;
-      allow list: if false;
-      allow create: if request.auth != null && request.auth.uid == userId
-        && request.resource.data.keys().hasOnly(['cardId','kind','createdAt'])
-        && request.resource.data.cardId is string
-        && request.resource.data.cardId.matches('^[A-Za-z0-9_-]{1,64}$')
-        && request.resource.data.kind in ['correct','wrong']
-        && request.resource.data.createdAt is timestamp;
-      allow update, delete: if false;
-    }
-    match /{document=**} {
-      allow read, write: if false;
-    }
-  }
-})
+        && cardId.matches('^[A-Za-z0-9_-]{1,64}$')
         && request.resource.data.keys().hasOnly(['status','card','updatedAt'])
         && request.resource.data.keys().hasAll(['status','updatedAt'])
         && request.resource.data.status in ['active','archived','purged']
