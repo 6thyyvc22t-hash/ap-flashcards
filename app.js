@@ -14,6 +14,8 @@ const KEY_NOTES_CACHE_PREFIX='ap-flashcards-notes-cache-v1:';
 const BACKUP_NOTES_KIND='ap-flashcards-notes';
 let cloud=null,cloudUser=null,cloudStarting=false,preCloudSnapshot=null;
 let memoCloud=null,memoUserId=null;
+let deckCloud=null,deckUserId=null,deckCloudLoaded=false,deckOverrides={},legacyDraft=null,mergeCloudDeckFn=null;
+const KEY_DRAFT_BACKUP='ap-flashcards-deck-draft-before-sync-v1';
 
 const fields=['category','question','answer','explanation','point'];
 const state={base:null,deck:null,draft:null,progress:{},notes:{},storage:false,category:'ALL',mode:'ordered',current:null,answerShown:false,visibleIds:[],conflict:null};
@@ -122,19 +124,94 @@ function showAlert(id,message){$(id).textContent=message;$(id).classList.remove(
 function clearAlert(id){$(id).classList.add('hidden');$(id).textContent='';}
 function store(key,value){if(!state.storage)return false;try{localStorage.setItem(key,JSON.stringify(value));return true;}catch{state.storage=false;updateSaveNotice();return false;}}
 function read(key){try{return JSON.parse(localStorage.getItem(key)||'null');}catch{return null;}}
+
+// An edit changes only affected IDs. Never interpret an ID absent in an older
+// local draft as a deletion: GitHub may have added that ID afterwards.
+function deckStatusMap(deck){
+ const out={};
+ for(const c of deck.cards)out[c.id]={status:'active',card:c};
+ for(const c of deck.archivedCards)out[c.id]={status:'archived',card:c};
+ for(const id of deck.retiredIds)out[id]={status:'purged'};
+ return out;
+}
+function deckDiff(before,after){
+ const old=deckStatusMap(before),next=deckStatusMap(after),changes=[];
+ for(const [id,change] of Object.entries(next)){
+  if(JSON.stringify(old[id])!==JSON.stringify(change))changes.push({id,change});
+ }
+ return changes;
+}
+function legacyDraftDiff(){
+ if(!legacyDraft?.deck)return {changes:[],skipped:0};
+ const local=validateDeck(legacyDraft.deck),changes=deckDiff(state.base,local);
+ const safe=changes.filter(x=>!Object.prototype.hasOwnProperty.call(deckOverrides,x.id));
+ return {changes:safe,skipped:changes.length-safe.length};
+}
+function updateDeckMigration(){
+ const btn=$('cloudMigrateDeck'),info=$('cloudDeckMigrationInfo');
+ if(!btn||!info)return;
+ const ready=!!(deckUserId&&deckCloudLoaded&&legacyDraft?.deck);
+ btn.classList.toggle('hidden',!ready);
+ info.classList.toggle('hidden',!ready);
+ if(ready){
+  try{
+   const summary=legacyDraftDiff();
+   info.textContent='以前の端末下書きあり。移行候補 '+summary.changes.length+'件（クラウドに変更済みの '+summary.skipped+'件は上書きしません）。';
+  }catch(e){info.textContent='下書きを検証できません: '+e.message}
+ }
+}
+function migrateLegacyDeck(){
+ if(!deckUserId||!deckCloud?.loaded||!legacyDraft?.deck)return;
+ let result;
+ try{result=legacyDraftDiff()}catch(e){alert('下書きの検証に失敗: '+e.message);return}
+ const kinds={active:0,archived:0,purged:0};
+ for(const item of result.changes)kinds[item.change.status]++;
+ if(!confirm('以前この端末で行った問題変更をクラウドに移行します。\n追加・編集 '+kinds.active+'件／保管 '+kinds.archived+'件／完全削除 '+kinds.purged+'件。\nクラウド側で変更済みの '+result.skipped+'件は上書きしません。iPadにも反映されます。実行しますか？'))return;
+ if(!store(KEY_DRAFT_BACKUP,legacyDraft)){alert('下書きのバックアップ保存に失敗しました。移行を中止します。');return}
+ for(const {id,change} of result.changes){
+  if(!deckCloud.queueChange(id,change)){alert('Q'+id+' の送信待ち保存に失敗しました。下書きは残しています。');return}
+ }
+ try{localStorage.removeItem(KEY_DRAFT)}
+ catch{alert('クラウド送信待ちは保存しましたが、古い下書きを削除できませんでした。');return}
+ legacyDraft=null;state.draft=null;updateView();
+ alert(result.changes.length+'件をクラウド送信待ちへ登録しました。同期状態をご確認ください。');
+}
+function showDeckCloudStatus(message,isError=false){
+ const el=$('deckCloudStatus');if(!el)return;
+ el.textContent=message;
+ el.classList.toggle('errorText',isError);
+ el.classList.toggle('okText',!isError&&message.startsWith('✓'));
+}
+
 function updateSaveNotice(){
  const txt=state.storage?(cloudUser?'✓ 学習記録を端末にも保存し、Firebaseクラウドと同期します。未送信がある場合は下の同期状態をご確認ください。':'✓ 学習記録と端末の編集内容はこのブラウザ内に保存されます。Firebaseログイン後に端末間で同期できます。'):'⚠ この表示環境では端末への自動保存ができません。必ずJSONを書き出してください。';
  $('saveNotice').textContent=txt;$('saveNotice').className='alert '+(state.storage?'note':'warning');
 }
 function setDraft(deck){
- state.deck=validateDeck(deck);
+ const candidate=validateDeck(deck);
+ if(deckUserId&&deckCloud&&deckCloudLoaded){
+  const changes=deckDiff(state.deck,candidate);
+  if(!changes.length)return;
+  for(const {id,change} of changes){
+   if(!deckCloud.queueChange(id,change)){
+    alert('問題変更の端末保存に失敗しました。端末容量と同期状態を確認してください。');return;
+   }
+  }
+  return;
+ }
+ state.deck=candidate;
  state.draft={baseRevision:state.base.revision,deck:state.deck};
- store(KEY_DRAFT,state.draft);
+ if(!store(KEY_DRAFT,state.draft))alert('問題を端末に保存できませんでした。JSONバックアップを取ってください。');
+ if(deckUserId){legacyDraft=state.draft;showDeckCloudStatus('⚠ クラウド接続待ちのため端末下書きに保存しました',true)}
  updateView();
 }
 function updateDraftNotice(){
- $('draftStatus').textContent=state.draft?'この端末で編集した下書きを使用中（未公開）':'GitHub公開版を使用中';
+ if(deckUserId){
+  $('draftStatus').textContent=deckCloudLoaded?'個人用問題変更をクラウド同期中（送信待ち '+(deckCloud?.pendingCount||0)+'件）':'問題データのクラウド読込待ち';
+ }else $('draftStatus').textContent=state.draft?'この端末で編集した下書きを使用中（未公開）':'GitHub公開版を使用中';
  $('archivedCount').textContent='削除済み保管：'+state.deck.archivedCards.length+'問';
+ $('discardDraft').classList.toggle('hidden',!!(deckUserId&&!legacyDraft));
+ updateDeckMigration();
 }
 function getPool(){return state.deck.cards.filter(c=>(state.category==='ALL'||c.category===state.category)&&(state.mode==='missed'?r(c.id).needsReview:state.mode==='new'?!r(c.id).seen:true)).map(c=>c.id);}
 function chooseRandom(ids,exclude){const eligible=ids.length>1?ids.filter(id=>id!==exclude):ids;return eligible[Math.floor(Math.random()*eligible.length)]||null;}
@@ -221,7 +298,9 @@ function importProgress(file){
 }
 function exportDeck(){const deck={...state.deck,revision:new Date().toISOString()};fileDownload(deck,'questions.json');}
 function importDeck(file){
- if(!file)return;file.text().then(txt=>{
+ if(!file)return;
+ if(deckUserId){alert('クラウド同期中は問題JSONの一括読込を停止しています。ログアウトして端末下書きに読み込み、再ログインして「以前の端末下書きをクラウドへ移行」を使ってください。');return}
+ file.text().then(txt=>{
   const candidate=validateDeck(JSON.parse(txt));
   if(!confirm(`問題データを ${candidate.cards.length}問に置き換えますか？\n現在の問題データは自動保存されません。事前の書き出しをおすすめします。\n学習記録は問題IDに紐付いたまま維持します。`))return;
   setDraft(candidate);alert('端末上の問題データを更新しました。全端末への公開はGitHubのquestions.jsonを更新してください。');
@@ -266,7 +345,13 @@ function submitEditor(event){
  if(state.deck.cards.some(x=>x.id!==id&&x.category===data.category&&normalized(x.question)===normalized(data.question))){alert('同じ分野に同じ問題文があります。重複を確認してください。');return}
  const deck=structuredClone(state.deck);
  if(id){const idx=deck.cards.findIndex(c=>c.id===id);if(idx<0)return;deck.cards[idx]={...deck.cards[idx],...data};}
- else{const newId=String(deck.nextId).padStart(3,'0');deck.nextId+=1;deck.cards.push({id:newId,section_no:deck.nextId-1,...data,origin:'手動追加（ユーザー編集）'});}
+ else{
+  const logged=!!deckUserId;
+  const newId=logged?'u'+(globalThis.crypto?.randomUUID?.()||String(Date.now())+Math.random().toString(36).slice(2)).replace(/-/g,''):String(deck.nextId).padStart(3,'0');
+  if(!logged)deck.nextId+=1;
+  const section=Math.max(0,...deck.cards.filter(c=>c.category===data.category).map(c=>Number(c.section_no)||0))+1;
+  deck.cards.push({id:newId,section_no:section,...data,origin:'手動追加（ユーザー編集）'});
+ }
  setDraft(deck);hideEditor();
 }
 function deleteCard(id){const card=state.deck.cards.find(c=>c.id===id);if(!card)return;
@@ -276,20 +361,27 @@ function deleteCard(id){const card=state.deck.cards.find(c=>c.id===id);if(!card)
 function restoreCard(id){const c=state.deck.archivedCards.find(c=>c.id===id);if(!c)return;
  const deck=structuredClone(state.deck);deck.archivedCards=deck.archivedCards.filter(c=>c.id!==id);deck.cards.push(c);
  // Restore the original numeric card sequence, including older IDs.
- deck.cards.sort((a,b)=>Number(a.id)-Number(b.id));setDraft(deck);
+ deck.cards.sort((a,b)=>{const an=/^\d+$/.test(a.id),bn=/^\d+$/.test(b.id);return an&&bn?Number(a.id)-Number(b.id):an?-1:bn?1:a.id.localeCompare(b.id)});setDraft(deck);
 }
 function purgeCard(id){
  // Active cards can be permanently removed directly, without first archiving them.
  const c=state.deck.cards.find(c=>c.id===id)||state.deck.archivedCards.find(c=>c.id===id);
  if(!c)return;
- if(!confirm(`Q${id}「${c.question}」を完全削除しますか？\n問題文・正答を問題データから除き、復元できなくなります。\n公開版への反映にはquestions.jsonのGitHub更新が必要です。学習履歴・メモは別管理で残ります。`))return;
+ if(!confirm(`Q${id}「${c.question}」を完全削除しますか？\n問題文・正答を問題データから除き、復元できなくなります。\nログイン中は同じアカウントの他端末へ自動反映します。学習履歴・メモは別管理で残ります。`))return;
  const deck=structuredClone(state.deck);
  deck.cards=deck.cards.filter(c=>c.id!==id);
  deck.archivedCards=deck.archivedCards.filter(c=>c.id!==id);
  if(!deck.retiredIds.includes(id))deck.retiredIds.push(id);
  setDraft(deck);
 }
-function discardDraft(){if(!state.draft)return;
+function discardDraft(){
+ if(deckUserId){
+  if(!legacyDraft)return;
+  if(!confirm('以前の端末下書きを破棄しますか？クラウドの問題・成績・メモは変更しません。'))return;
+  try{localStorage.removeItem(KEY_DRAFT)}catch{}
+  legacyDraft=null;state.draft=null;updateView();return;
+ }
+ if(!state.draft)return;
  if(!confirm('この端末で編集した問題データを破棄し、GitHub公開版に戻しますか？ 学習記録は残ります。'))return;
  state.draft=null;state.deck=structuredClone(state.base);if(state.storage)localStorage.removeItem(KEY_DRAFT);clearAlert('syncNotice');hideEditor();updateView();
 }
@@ -329,6 +421,7 @@ function initHandlers(){
  $('cloudLogout').addEventListener('click',async()=>{if(!cloud)return;try{await cloud.signOut()}catch(e){showCloudStatus('ログアウト失敗：'+e.message,true)}});
  $('cloudMigrate').addEventListener('click',migrateOldProgress);
  $('cloudMigrateNotes').addEventListener('click',migrateOldNotes);
+ $('cloudMigrateDeck').addEventListener('click',migrateLegacyDeck);
  $('cloudExportLegacy').addEventListener('click',()=>{if(preCloudSnapshot)fileDownload({type:BACKUP_KIND,version:2,deckId:DECK_ID,exportedAt:new Date().toISOString(),progress:preCloudSnapshot},'ap-flashcards-before-cloud.json')});
  $('firebaseApplyConfig').addEventListener('click',()=>{
   try{const v=parseFirebaseConfig($('firebaseConfigInput').value);if(!state.storage)throw Error('端末ストレージが利用できないため設定を保存できません');store(KEY_FIREBASE_CONFIG,v);alert('Firebase設定を保存しました。画面を再読み込みして接続します。');location.reload();}
@@ -431,6 +524,28 @@ async function initCloud(){
      },
      onStatus(message,isError){updateMemoStatus(message,isError)}
    });
+   const {createDeckSync,mergeCloudDeck}=await import('./deck-sync.js');
+   mergeCloudDeckFn=mergeCloudDeck;
+   deckCloud=createDeckSync({
+     onUser(user){
+       deckUserId=user?.uid||null;
+       deckCloudLoaded=false;deckOverrides={};legacyDraft=read(KEY_DRAFT);
+       if(deckUserId){state.draft=null;state.deck=structuredClone(state.base)}
+       else{
+         const old=legacyDraft?.deck&&legacyDraft.baseRevision===state.base.revision?legacyDraft.deck:null;
+         if(old){try{state.deck=validateDeck(old);state.draft=legacyDraft}catch{state.deck=structuredClone(state.base);state.draft=null}}
+         else{state.deck=structuredClone(state.base);state.draft=null}
+       }
+       updateView();
+     },
+     onDeck(overrides,loaded){
+       if(!deckUserId)return;
+       deckOverrides=overrides;deckCloudLoaded=loaded;
+       try{state.deck=validateDeck(mergeCloudDeckFn(state.base,deckOverrides));state.draft=null;updateView()}
+       catch(e){showDeckCloudStatus('⚠ 問題データの統合に失敗: '+e.message,true)}
+     },
+     onStatus(message,isError){showDeckCloudStatus(message,isError)}
+   });
  }catch(e){showCloudStatus('Firebaseへの接続失敗：'+e.message+'。設定や通信を確認してください。',true)}
 }
 
@@ -450,6 +565,7 @@ async function init(){
    if(historical)state.progress=cleanProgress(historical);
    if(!current&&historical)store(KEY_PROGRESS,state.progress);
    const draft=read(KEY_DRAFT);
+   legacyDraft=draft;
    if(draft&&draft.baseRevision&&draft.deck){
     try{
      const decoded=validateDeck(draft.deck);
