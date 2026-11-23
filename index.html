@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>応用情報 科目B｜デジタル単語帳</title>
-  <link rel="stylesheet" href="styles.css">
-  <script src="app.js?v=deck-sync-20261123" defer></script>
+  <link rel="stylesheet" href="styles.css?v=jump-20261124">
+  <script src="app.js?v=jump-20261124" defer></script>
 </head>
 <body>
 <main class="page">
@@ -56,6 +56,11 @@
     <section class="controls panel" aria-label="出題条件">
       <label>出題分野<select id="categoryFilter"><option value="ALL">全分野</option></select></label>
       <label>出題方法<select id="modeFilter"><option value="ordered">順番に出題</option><option value="random">ランダム</option><option value="missed">間違えた問題のみ</option><option value="new">未学習のみ</option></select></label>
+      <div class="jumpGroup" id="jumpGroup">
+        <label for="jumpSelect">開始する問題を選ぶ</label>
+        <div class="jumpRow"><select id="jumpSelect" aria-describedby="jumpHelp"></select><button id="jumpBtn" type="button">ここから開始</button></div>
+        <p id="jumpHelp" class="small" role="status">現在の出題条件に合う問題から選択できます。</p>
+      </div>
     </section>
 
     <div class="questionHead"><span id="questionIndex">Q---</span><span id="progressText">0 / 0</span></div>
