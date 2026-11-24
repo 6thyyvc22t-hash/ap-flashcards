@@ -2,9 +2,9 @@
   "schemaVersion": 2,
   "deckId": "ap-kamoku-b",
   "title": "応用情報技術者試験 科目B デジタル単語帳",
-  "revision": "2026-11-24-security-dictionary-immutable",
+  "revision": "2026-11-25-security-aes-h29a",
   "description": "AI予想問題。過去問論点を踏まえた短問短答であり、実際の試験問題を再現したものではありません。",
-  "nextId": 277,
+  "nextId": 278,
   "categories": [
     "情報セキュリティ",
     "プロジェクトマネジメント",
@@ -2472,6 +2472,16 @@
       "explanation": "一定の保護期間中は、バックアップデータを変更・削除できないようにする方式。ランサムウェア侵害時にバックアップ自体が暗号化・消去されるリスクを減らす。",
       "point": "イミュータブル＝変更不可。3-2-1ルールはバックアップの複製・媒体・保管場所の考え方であり、組み合わせて使う。実際の復元試験も重要。",
       "origin": "AI新規予想問題（2026-11-24情報セキュリティ予想候補8。ランサムウェア対策・バックアップ保護の論点。過去問原文ではない）"
+    },
+    {
+      "id": "277",
+      "section_no": 108,
+      "category": "情報セキュリティ",
+      "question": "データベースの暗号化に用いられる、代表的な共通鍵暗号アルゴリズムは？",
+      "answer": "AES（Advanced Encryption Standard）",
+      "explanation": "AESは暗号化と復号に同じ鍵を使う共通鍵暗号方式の代表例。RSAは公開鍵暗号方式、SHAはハッシュ関数、MACはメッセージ認証コードであり、用途が異なる。",
+      "point": "AES＝共通鍵暗号。RSA＝公開鍵暗号。SHA＝ハッシュ関数。MAC＝メッセージ認証コード。平成29年秋期午後問1の選択肢で違いを判断させた。",
+      "origin": "平成29年度秋期 応用情報技術者試験 午後問1（個人情報保護の強化）設問1(2)bの解答群に基づきAIが単語帳向けに再構成。IPA問題：https://www.ipa.go.jp/shiken/mondai-kaiotu/gmcbt8000000fqpm-att/2017h29a_ap_pm_qs.pdf IPA解答：https://www.ipa.go.jp/shiken/mondai-kaiotu/gmcbt8000000fqpm-att/2017h29a_ap_pm_ans.pdf （過去問原文ではない。直前の候補番号21）"
     }
   ],
   "archivedCards": [],
