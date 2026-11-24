@@ -2,9 +2,9 @@
   "schemaVersion": 2,
   "deckId": "ap-kamoku-b",
   "title": "応用情報技術者試験 科目B デジタル単語帳",
-  "revision": "2026-11-25-security-aes-h29a",
+  "revision": "2026-11-25-pm-h28-h30-prototype-delphi-fitgap",
   "description": "AI予想問題。過去問論点を踏まえた短問短答であり、実際の試験問題を再現したものではありません。",
-  "nextId": 278,
+  "nextId": 281,
   "categories": [
     "情報セキュリティ",
     "プロジェクトマネジメント",
@@ -2482,6 +2482,36 @@
       "explanation": "AESは暗号化と復号に同じ鍵を使う共通鍵暗号方式の代表例。RSAは公開鍵暗号方式、SHAはハッシュ関数、MACはメッセージ認証コードであり、用途が異なる。",
       "point": "AES＝共通鍵暗号。RSA＝公開鍵暗号。SHA＝ハッシュ関数。MAC＝メッセージ認証コード。平成29年秋期午後問1の選択肢で違いを判断させた。",
       "origin": "平成29年度秋期 応用情報技術者試験 午後問1（個人情報保護の強化）設問1(2)bの解答群に基づきAIが単語帳向けに再構成。IPA問題：https://www.ipa.go.jp/shiken/mondai-kaiotu/gmcbt8000000fqpm-att/2017h29a_ap_pm_qs.pdf IPA解答：https://www.ipa.go.jp/shiken/mondai-kaiotu/gmcbt8000000fqpm-att/2017h29a_ap_pm_ans.pdf （過去問原文ではない。直前の候補番号21）"
+    },
+    {
+      "id": "278",
+      "section_no": 56,
+      "category": "プロジェクトマネジメント",
+      "question": "ERP標準機能の業務イメージを早期に確認するため、試作して実際に動かすものは？",
+      "answer": "プロトタイプ",
+      "explanation": "システムの試作品を早い段階で実際に動かし、利用者が画面や業務の流れを確認して、要件・設計への認識を合わせる。",
+      "point": "プロトタイプ＝利用者が動作を確認する試作品。PoCは技術的な実現可能性の検証。MVPは価値を検証する最小限の製品。",
+      "origin": "平成30年度秋期 応用情報技術者試験 午後問9 設問2(1)（ERPパッケージ導入の計画）：IPA公式解答例で「プロトタイプ」。元の出題論点をAIが単語帳用に再構成（過去問原文ではない）。https://www.ipa.go.jp/shiken/mondai-kaiotu/gmcbt8000000f01f-att/2018h30a_ap_pm_ans.pdf"
+    },
+    {
+      "id": "279",
+      "section_no": 57,
+      "category": "プロジェクトマネジメント",
+      "question": "複数の専門家に匿名で意見を求め、結果をフィードバックしながら繰り返して意見を収束させる手法は？",
+      "answer": "デルファイ法",
+      "explanation": "専門家から個別・匿名で意見を集め、集計結果を共有して再調査を繰り返すことにより、予測やリスクの評価などの合意形成を図る。",
+      "point": "デルファイ法＝匿名の専門家アンケート＋結果のフィードバック＋複数回の繰返し。単なる会議や多数決とは区別。",
+      "origin": "平成30年度春期 応用情報技術者試験 午後問9 設問1(1)（ERP導入のリスク管理）：IPA公式解答例「デルファイ法」。元の出題論点をAIが単語帳用に再構成（過去問原文ではない）。https://www.ipa.go.jp/shiken/mondai-kaiotu/gmcbt8000000fabr-att/2018h30h_ap_pm_ans.pdf"
+    },
+    {
+      "id": "280",
+      "section_no": 58,
+      "category": "プロジェクトマネジメント",
+      "question": "自社の業務プロセス・要求機能とパッケージの標準機能を比較し、適合する部分と不足部分を調べる分析は？",
+      "answer": "フィット＆ギャップ分析",
+      "explanation": "業務で必要な機能とパッケージ標準機能を照合し、適合点と機能不足・業務上の差異を洗い出して、追加開発や業務変更の要否を判断する。",
+      "point": "Fit＝要求に適合、Gap＝不足・差異。実施前に業務プロセスや要求機能を洗い出し、現場の利用部門も参加させる。",
+      "origin": "平成28年度秋期 応用情報技術者試験 午後問9（料金システム更新）：問題本文のフィット＆ギャップ分析の論点をAIが単語帳用に再構成（過去問原文ではない）。https://www.ipa.go.jp/shiken/mondai-kaiotu/gmcbt8000000g6fw-att/2016h28a_ap_pm_qs.pdf"
     }
   ],
   "archivedCards": [],
