@@ -22,3 +22,10 @@
 .jumpRow button{flex:0 0 auto;white-space:nowrap}
 .jumpGroup .small{margin:6px 0 0;line-height:1.4}
 @media(max-width:600px){.jumpRow button{padding:10px 8px;font-size:12px}}
+
+/* Per-card cumulative scores; read-only, shared by both card sides. */
+.topLine{align-items:flex-start;flex-wrap:wrap}
+.cardTopRight{margin-left:auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px;min-width:0}
+.cardCounts{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:3px 10px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.cardCounts>span{white-space:nowrap}
+.cardCountCorrect{color:var(--green)}.cardCountWrong{color:var(--red)}

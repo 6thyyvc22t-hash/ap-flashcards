@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="color-scheme" content="dark">
   <title>応用情報 科目B｜デジタル単語帳</title>
-  <link rel="stylesheet" href="styles.css?v=jump-20261124">
-  <script src="app.js?v=jump-20261124" defer></script>
+  <link rel="stylesheet" href="styles.css?v=card-counts-20261126">
+  <script src="app.js?v=card-counts-20261126" defer></script>
 </head>
 <body>
 <main class="page">
@@ -66,7 +66,7 @@
     <div class="questionHead"><span id="questionIndex">Q---</span><span id="progressText">0 / 0</span></div>
     <div class="progress"><div id="progressBar"></div></div>
     <article class="flash panel" id="card" tabindex="0" role="button" aria-label="カードをタップして答えを表示">
-      <div class="topLine"><span class="chip" id="cardCategory">分野</span><span class="muted" id="cardSide">表面・問題</span></div>
+      <div class="topLine"><span class="chip" id="cardCategory">分野</span><div class="cardTopRight"><div class="cardCounts" aria-label="この問題の累積成績"><span class="cardCountCorrect">✓ 正解 <strong id="cardCorrectCount">0</strong>回</span><span class="cardCountWrong">× 不正解 <strong id="cardWrongCount">0</strong>回</span></div><span class="muted" id="cardSide">表面・問題</span></div></div>
       <h2 id="questionText"></h2>
       <div id="answerArea" class="answer hidden">
         <div class="divider"></div>

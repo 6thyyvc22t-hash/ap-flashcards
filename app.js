@@ -276,6 +276,9 @@ function render(){
  $('progressBar').style.width=has?(100*(pool.indexOf(card.id)+1)/pool.length).toFixed(2)+'%':'0%';
  if(has){
    $('cardCategory').textContent=card.category;$('questionText').textContent=card.question;
+   const score=r(card.id),correctCount=$('cardCorrectCount'),wrongCount=$('cardWrongCount');
+   if(correctCount)correctCount.textContent=String(positive(score.correct));
+   if(wrongCount)wrongCount.textContent=String(positive(score.incorrect));
    $('answerText').textContent=card.answer;$('explanationText').textContent=card.explanation||'';
    $('pointText').textContent=card.point?'試験対策：'+card.point:'';
    $('answerArea').classList.toggle('hidden',!state.answerShown);
