@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark">
   <title>応用情報 科目B｜デジタル単語帳</title>
   <link rel="stylesheet" href="styles.css?v=card-counts-20261126">
-  <script src="app.js?v=card-counts-20261126" defer></script>
+  <script src="app.js?v=ranked-study-20261128" defer></script>
 </head>
 <body>
 <main class="page">
@@ -55,7 +55,7 @@
 
     <section class="controls panel" aria-label="出題条件">
       <label>出題分野<select id="categoryFilter"><option value="ALL">全分野</option></select></label>
-      <label>出題方法<select id="modeFilter"><option value="ordered">順番に出題</option><option value="random">ランダム</option><option value="missed">間違えた問題のみ</option><option value="new">未学習のみ</option></select></label>
+      <label>出題方法<select id="modeFilter"><option value="ordered">順番に出題</option><option value="random">ランダム</option><option value="missed">間違えた問題のみ</option><option value="new">未学習のみ</option><option value="wrong-count">不正解回数が多い順</option><option value="low-accuracy">正答率が低い順</option></select></label>
       <div class="jumpGroup" id="jumpGroup">
         <label for="jumpSelect">開始する問題を選ぶ</label>
         <div class="jumpRow"><select id="jumpSelect" aria-describedby="jumpHelp"></select><button id="jumpBtn" type="button">ここから開始</button></div>

@@ -18,7 +18,7 @@ let deckCloud=null,deckUserId=null,deckCloudLoaded=false,deckOverrides={},legacy
 const KEY_DRAFT_BACKUP='ap-flashcards-deck-draft-before-sync-v1';
 
 const fields=['category','question','answer','explanation','point'];
-const state={base:null,deck:null,draft:null,progress:{},notes:{},storage:false,category:'ALL',mode:'ordered',current:null,answerShown:false,visibleIds:[],conflict:null};
+const state={base:null,deck:null,draft:null,progress:{},notes:{},storage:false,category:'ALL',mode:'ordered',current:null,answerShown:false,visibleIds:[],rankPool:null,conflict:null};
 const idIndex=()=>new Map(state.deck.cards.map((x,i)=>[x.id,i]));
 const r=(id)=>state.progress[id]||{seen:false,correct:0,incorrect:0,needsReview:false};
 const positive=(x)=>Number.isFinite(Number(x))?Math.max(0,Math.floor(Number(x))):0;
@@ -213,7 +213,25 @@ function updateDraftNotice(){
  $('discardDraft').classList.toggle('hidden',!!(deckUserId&&!legacyDraft));
  updateDeckMigration();
 }
-function getPool(){return state.deck.cards.filter(c=>(state.category==='ALL'||c.category===state.category)&&(state.mode==='missed'?r(c.id).needsReview:state.mode==='new'?!r(c.id).seen:true)).map(c=>c.id);}
+function isRankedMode(){return state.mode==='wrong-count'||state.mode==='low-accuracy';}
+function rankIds(ids){
+ const scores=new Map(ids.map(id=>{const x=r(id),correct=positive(x.correct),wrong=positive(x.incorrect);return [id,{correct,wrong,total:correct+wrong}]}));
+ return [...ids].sort((a,b)=>{
+  const x=scores.get(a),y=scores.get(b);
+  if(state.mode==='wrong-count')return y.wrong-x.wrong||Number(y.total>0)-Number(x.total>0);
+  if(!x.total||!y.total)return Number(y.total>0)-Number(x.total>0);
+  return x.correct/x.total-y.correct/y.total||y.wrong-x.wrong;
+ });
+}
+function getPool(){
+ const ids=state.deck.cards.filter(c=>(state.category==='ALL'||c.category===state.category)&&(state.mode==='missed'?r(c.id).needsReview:state.mode==='new'?!r(c.id).seen:true)).map(c=>c.id);
+ if(!isRankedMode())return ids;
+ // Freeze order for a pass so grades and cloud progress updates cannot skip cards.
+ if(!state.rankPool)state.rankPool=rankIds(ids);
+ const available=new Set(ids),kept=state.rankPool.filter(id=>available.has(id)),known=new Set(kept);
+ state.rankPool=[...kept,...rankIds(ids.filter(id=>!known.has(id)))];
+ return state.rankPool;
+}
 function renderJump(pool){
  const group=$('jumpGroup'),select=$('jumpSelect'),button=$('jumpBtn');
  const sequential=state.mode!=='random';
@@ -231,7 +249,7 @@ function renderJump(pool){
  }
  select.disabled=button.disabled=pool.length===0;
  select.value=state.current||'';
- $('jumpHelp').textContent=pool.length?`現在の条件の全${pool.length}問から選択できます。移動しても学習記録は変わりません。`:'現在の条件に合う問題がありません。';
+ $('jumpHelp').textContent=pool.length?`現在の条件の全${pool.length}問から選択できます。${isRankedMode()?'並び順は1周ごとに最新成績で更新します。':'移動しても学習記録は変わりません。'}`:'現在の条件に合う問題がありません。';
 }
 function jumpToSelected(){
  if(state.mode==='random')return;
@@ -244,6 +262,13 @@ function nextCard(step=1,wasGraded=false){
  const pool=getPool();if(!pool.length){state.current=null;render();return;}
  const previous=state.current,order=state.deck.cards.map(c=>c.id);
  if(state.mode==='random'){state.current=chooseRandom(pool,previous)}
+ else if(isRankedMode()){
+   const index=pool.indexOf(previous);
+   if(index<0)state.current=pool[0];
+   else if(step>0&&index===pool.length-1){
+     state.rankPool=null;state.current=getPool()[0]||null;
+   }else state.current=pool[(index+step+pool.length)%pool.length];
+ }
  else if(pool.includes(previous)&&!wasGraded){state.current=pool[(pool.indexOf(previous)+step+pool.length)%pool.length]}
  else{
    const prevIndex=order.indexOf(previous);
@@ -255,7 +280,7 @@ function nextCard(step=1,wasGraded=false){
  }
  state.answerShown=false;render();
 }
-function resetSelection(){const pool=getPool();state.current=state.mode==='random'?chooseRandom(pool):pool[0]||null;state.answerShown=false;render();}
+function resetSelection(){state.rankPool=null;const pool=getPool();state.current=state.mode==='random'?chooseRandom(pool):pool[0]||null;state.answerShown=false;render();}
 function renderStats(){
  const cards=state.deck.cards;
  let studied=0,correct=0,wrong=0,missed=0;
